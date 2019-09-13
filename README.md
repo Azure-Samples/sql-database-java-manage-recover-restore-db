@@ -4,9 +4,8 @@ languages:
 - java
 products:
 - azure
-extensions:
-- services: Sql
-- platforms: java
+description: "Getting Started with Sql - Manage Sql With Recovered Or Restored Database - in Java"
+urlFragment: sql-database-java-manage-recover-restore-db
 ---
 
 # Getting Started with Sql - Manage Sql With Recovered Or Restored Database - in Java #
