@@ -4,11 +4,11 @@ languages:
 - java
 products:
 - azure
-description: "Getting Started with Sql - Manage Sql With Recovered Or Restored Database - in Java"
+description: "Azure SQL sample for managing point in time restore and recover a deleted SQL Database."
 urlFragment: sql-database-java-manage-recover-restore-db
 ---
 
-# Getting Started with Sql - Manage Sql With Recovered Or Restored Database - in Java #
+# Manage SQL With Recovered Or Restored Database (Java)
 
 
   Azure SQL sample for managing point in time restore and recover a deleted SQL Database -
