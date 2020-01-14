@@ -4,11 +4,12 @@ languages:
 - java
 products:
 - azure
-description: "Azure SQL sample for managing point in time restore and recover a deleted SQL Database."
-urlFragment: sql-database-java-manage-recover-restore-db
+extensions:
+- services: Sql
+- platforms: java
 ---
 
-# Manage SQL With Recovered Or Restored Database (Java)
+# Getting Started with Sql - Manage Sql With Recovered Or Restored Database - in Java #
 
 
   Azure SQL sample for managing point in time restore and recover a deleted SQL Database -
@@ -24,13 +25,11 @@ To run this sample:
 
 Set the environment variable `AZURE_AUTH_LOCATION` with the full path for an auth file. See [how to create an auth file](https://github.com/Azure/azure-libraries-for-java/blob/master/AUTH.md).
 
-```bash
-git clone https://github.com/Azure-Samples/sql-database-java-manage-recover-restore-db.git
+    git clone https://github.com/Azure-Samples/sql-database-java-manage-recover-restore-db.git
 
-cd sql-database-java-manage-recover-restore-db
+    cd sql-database-java-manage-recover-restore-db
 
-mvn clean compile exec:java
-```
+    mvn clean compile exec:java
 
 ## More information ##
 
