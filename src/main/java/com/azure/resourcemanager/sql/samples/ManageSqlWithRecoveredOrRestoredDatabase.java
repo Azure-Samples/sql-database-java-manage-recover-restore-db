@@ -1,31 +1,27 @@
-/**
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for
- * license information.
- */
-package com.microsoft.azure.management.sql.samples;
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+package com.azure.resourcemanager.sql.samples;
 
-import com.microsoft.azure.AzureEnvironment;
-import com.microsoft.azure.AzureResponseBuilder;
-import com.microsoft.azure.credentials.ApplicationTokenCredentials;
-import com.microsoft.azure.management.Azure;
-import com.microsoft.azure.management.resources.fluentcore.arm.Region;
-import com.microsoft.azure.management.resources.fluentcore.utils.SdkContext;
-import com.microsoft.azure.management.samples.Utils;
-import com.microsoft.azure.management.sql.RestorePoint;
-import com.microsoft.azure.management.sql.SampleName;
-import com.microsoft.azure.management.sql.SqlDatabase;
-import com.microsoft.azure.management.sql.SqlDatabaseStandardServiceObjective;
-import com.microsoft.azure.management.sql.SqlRestorableDroppedDatabase;
-import com.microsoft.azure.management.sql.SqlServer;
-import com.microsoft.azure.serializer.AzureJacksonAdapter;
-import com.microsoft.rest.LogLevel;
-import com.microsoft.rest.RestClient;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
-import java.io.File;
-import java.util.concurrent.TimeUnit;
+import com.azure.core.credential.TokenCredential;
+import com.azure.core.http.policy.HttpLogDetailLevel;
+import com.azure.core.management.AzureEnvironment;
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.resourcemanager.AzureResourceManager;
+import com.azure.core.management.Region;
+import com.azure.core.management.profile.AzureProfile;
+import com.azure.resourcemanager.resources.fluentcore.utils.ResourceManagerUtils;
+import com.azure.resourcemanager.samples.Utils;
+import com.azure.resourcemanager.sql.models.RestorePoint;
+import com.azure.resourcemanager.sql.models.SampleName;
+import com.azure.resourcemanager.sql.models.SqlDatabase;
+import com.azure.resourcemanager.sql.models.SqlDatabaseStandardServiceObjective;
+import com.azure.resourcemanager.sql.models.SqlRestorableDroppedDatabase;
+import com.azure.resourcemanager.sql.models.SqlServer;
+
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Azure SQL sample for managing point in time restore and recover a deleted SQL Database -
@@ -37,15 +33,14 @@ import java.util.concurrent.TimeUnit;
 public final class ManageSqlWithRecoveredOrRestoredDatabase {
     /**
      * Main function which runs the actual sample.
-     * @param azure instance of the azure client
+     * @param azureResourceManager instance of the azure client
      * @return true if sample runs successfully
      */
-    public static boolean runSample(Azure azure) {
-        final String sqlServerName = Utils.createRandomName("sqlserver");
-        final String rgName = Utils.createRandomName("rgsql");
+    public static boolean runSample(AzureResourceManager azureResourceManager) {
+        final String sqlServerName = Utils.randomResourceName(azureResourceManager, "sqlserver", 20);
+        final String rgName = Utils.randomResourceName(azureResourceManager, "rgsql", 20);
         final String administratorLogin = "sqladmin3423";
-        // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Serves as an example, not for deployment. Please change when using this in your code.")]
-        final String administratorPassword = "myS3cureP@ssword";
+        final String administratorPassword = Utils.password();
         final String dbToDeleteName = "db-to-delete";
         final String dbToRestoreName = "db-to-restore";
         try {
@@ -53,8 +48,8 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
             // ============================================================
             // Create a SQL Server with two databases from a sample.
             System.out.println("Creating a SQL Server with two databases from a sample.");
-            SqlServer sqlServer = azure.sqlServers().define(sqlServerName)
-                .withRegion(Region.US_WEST2)
+            SqlServer sqlServer = azureResourceManager.sqlServers().define(sqlServerName)
+                .withRegion(Region.US_EAST)
                 .withNewResourceGroup(rgName)
                 .withAdministratorLogin(administratorLogin)
                 .withAdministratorPassword(administratorPassword)
@@ -70,7 +65,7 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
             Utils.print(sqlServer);
 
             // Sleep for 5 minutes to allow for the service to be aware of the new server and databases
-            SdkContext.sleep(5 * 60 * 1000);
+            ResourceManagerUtils.sleep(Duration.ofMinutes(5));
 
             SqlDatabase dbToBeDeleted = sqlServer.databases()
                 .get(dbToDeleteName);
@@ -87,7 +82,7 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
             while (retries > 0 && dbToRestore.listRestorePoints().size() == 0) {
                 retries--;
                 // Sleep for about 3 minutes
-                SdkContext.sleep(3 * 60 * 1000);
+                ResourceManagerUtils.sleep(Duration.ofMinutes(3));
             }
             if (retries == 0) {
                 return false;
@@ -95,10 +90,12 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
 
             RestorePoint restorePointInTime = dbToRestore.listRestorePoints().get(0);
             // Restore point might not be ready right away and we will have to wait for it.
-            DateTime currentTime = new DateTime(DateTimeZone.UTC);
-            long waitForRestoreToBeReady = restorePointInTime.earliestRestoreDate().getMillis() - currentTime.getMillis() + 5 * 60 * 1000;
+            OffsetDateTime currentTime = OffsetDateTime.now();
+            long waitForRestoreToBeReady = ChronoUnit.MILLIS.between(currentTime, restorePointInTime.earliestRestoreDate())
+                    + 5 * 60 * 1000;
+            System.out.printf("waitForRestoreToBeReady %d%n", waitForRestoreToBeReady);
             if (waitForRestoreToBeReady > 0) {
-                SdkContext.sleep((int) waitForRestoreToBeReady);
+                ResourceManagerUtils.sleep(Duration.ofMillis(waitForRestoreToBeReady));
             }
 
             SqlDatabase dbRestorePointInTime = sqlServer.databases()
@@ -111,8 +108,8 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
             // ============================================================
             // Restore the database form a point in time restore which is 5 minutes ago.
             dbRestorePointInTime = sqlServer.databases()
-                .define("db-restore-pit")
-                .fromRestorePoint(restorePointInTime, new DateTime(DateTimeZone.UTC).minusMinutes(5))
+                .define("db-restore-pit-2")
+                .fromRestorePoint(restorePointInTime, OffsetDateTime.now().minusMinutes(5))
                 .create();
             Utils.print(dbRestorePointInTime);
             dbRestorePointInTime.delete();
@@ -126,7 +123,7 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
             while (retries > 0 && sqlServer.listRestorableDroppedDatabases().size() == 0) {
                 retries--;
                 // Sleep for about 5 minutes
-                SdkContext.sleep(5 * 60 * 1000);
+                ResourceManagerUtils.sleep(Duration.ofMinutes(5));
             }
             SqlRestorableDroppedDatabase restorableDroppedDatabase = sqlServer.listRestorableDroppedDatabases().get(0);
             SqlDatabase dbRestoreDeleted = sqlServer.databases()
@@ -141,22 +138,17 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
 
             // Delete the SQL Server.
             System.out.println("Deleting a Sql Server");
-            azure.sqlServers().deleteById(sqlServer.id());
+            azureResourceManager.sqlServers().deleteById(sqlServer.id());
             return true;
-        } catch (Exception f) {
-            System.out.println(f.getMessage());
-            f.printStackTrace();
         } finally {
             try {
                 System.out.println("Deleting Resource Group: " + rgName);
-                azure.resourceGroups().deleteByName(rgName);
+                azureResourceManager.resourceGroups().beginDeleteByName(rgName);
                 System.out.println("Deleted Resource Group: " + rgName);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.out.println("Did not create any resources in Azure. No clean up is necessary");
             }
         }
-        return false;
     }
 
     /**
@@ -166,22 +158,21 @@ public final class ManageSqlWithRecoveredOrRestoredDatabase {
     public static void main(String[] args) {
         try {
 
-            final File credFile = new File(System.getenv("AZURE_AUTH_LOCATION"));
+            final AzureProfile profile = new AzureProfile(AzureEnvironment.AZURE);
+            final TokenCredential credential = new DefaultAzureCredentialBuilder()
+                .authorityHost(profile.getEnvironment().getActiveDirectoryEndpoint())
+                .build();
 
-            ApplicationTokenCredentials credentials = ApplicationTokenCredentials.fromFile(credFile);
-            RestClient restClient = new RestClient.Builder()
-                .withBaseUrl(AzureEnvironment.AZURE, AzureEnvironment.Endpoint.RESOURCE_MANAGER)
-                .withSerializerAdapter(new AzureJacksonAdapter())
-                .withReadTimeout(150, TimeUnit.SECONDS)
-                .withLogLevel(LogLevel.BODY)
-                .withResponseBuilderFactory(new AzureResponseBuilder.Factory())
-                .withCredentials(credentials).build();
-            Azure azure = Azure.authenticate(restClient, credentials.domain(), credentials.defaultSubscriptionId()).withDefaultSubscription();
+            AzureResourceManager azureResourceManager = AzureResourceManager
+                .configure()
+                .withLogLevel(HttpLogDetailLevel.BASIC)
+                .authenticate(credential, profile)
+                .withDefaultSubscription();
 
             // Print selected subscription
-            System.out.println("Selected subscription: " + azure.subscriptionId());
+            System.out.println("Selected subscription: " + azureResourceManager.subscriptionId());
 
-            runSample(azure);
+            runSample(azureResourceManager);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             e.printStackTrace();
