@@ -5,8 +5,8 @@ languages:
 products:
 - azure
 extensions:
-  services: Sql
-  platforms: java
+- services: Sql
+- platforms: java
 ---
 
 # Getting Started with Sql - Manage Sql With Recovered Or Restored Database - in Java #
